@@ -8,4 +8,8 @@ export default defineNuxtConfig({
   css: ["~/assets/css/main.css"],
   // MODULOS (FUNCIONES AGREGADAS PARA LA APLICACION)
   modules: ["@nuxt/ui"],
+  // PLUGINS (FUNCIONES AGREGADAS PARA LA APLICACION)
+  runtimeConfig: {
+    GEMINI_API_KEY: process.env.NUXT_GEMINI_API_KEY, // Disponible solo en el backend
+  },
 });
