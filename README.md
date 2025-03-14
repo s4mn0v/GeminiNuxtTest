@@ -21,3 +21,5 @@ Estoy desarrollando una aplicacion con nuxt 3, nuxt ui y la libreria de @google/
 
 [notas]
 [1] Yo ya tengo instaladas y configuradas mis dependecias, por ende tienes que basarte en las funciones y configuraciones de las versiones de mis dependencias.
+
+EJEMPLO
