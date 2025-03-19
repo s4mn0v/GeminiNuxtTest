@@ -10,30 +10,79 @@ export default defineEventHandler(async (event) => {
   }
 
   const body = await readBody(event);
-  if (!body?.message) {
-    return { error: "Debes enviar un mensaje en la petición." };
+  if (!body?.message && !body?.image) {
+    return { error: "Debes enviar un mensaje o una imagen en la petición." };
   }
 
   try {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // 🔹 Instrucción para que solo responda sobre Psicología
-    const prompt = `
-      Eres un experto en Psicología. Solo responde preguntas relacionadas con Psicología. 
-      Si te preguntan algo que no tenga que ver con Psicología, responde: "Lo siento, solo puedo responder preguntas de Psicología."
-      
-      Pregunta del estudiante: ${body.message}
-    `;
+    // 📌 Definir estructura del chat
+    interface ChatMessage {
+      sender: "user" | "bot";
+      text: string;
+    }
 
-    const result = await model.generateContent(prompt);
+    // 📌 Historial del chat (máximo 5 mensajes)
+    const chatHistory: ChatMessage[] = Array.isArray(body.chatHistory) 
+      ? body.chatHistory.slice(-5).filter((msg: any): msg is ChatMessage => 
+          msg && typeof msg.text === "string" && (msg.sender === "user" || msg.sender === "bot")
+        ) 
+      : [];
 
-    // 📌 Accediendo correctamente a la respuesta
-    const responseText = result?.response?.candidates?.[0]?.content?.parts?.map(p => p.text).join(" ") || "No pude generar una respuesta.";
+    // 📌 Formatear historial de mensajes
+    const lastMessages = chatHistory.map(msg => ({
+      text: `${msg.sender === "user" ? "Usuario" : "Bot"}: ${msg.text}`
+    }));
+
+    // 📌 Crear prompt para IA
+    const inputParts: any[] = [
+      {
+        text: `Eres un experto en Psicología, Derecho y Matemáticas. Solo responde preguntas relacionadas con estos temas.
+               Si te preguntan algo fuera de estos temas, responde: 
+               "Lo siento, solo puedo responder preguntas de Psicología, Derecho y Matemáticas."`
+      },
+      ...lastMessages
+    ];
+
+    if (body.message) {
+      inputParts.push({ text: `Usuario: ${body.message}` });
+    }
+
+    if (body.image) {
+      const base64Data = body.image.split(",")[1];
+
+      inputParts.push({
+        inlineData: {
+          mimeType: "image/png",
+          data: base64Data,
+        },
+      });
+
+      if (!body.message) {
+        inputParts.push({
+          text: "Analiza la imagen y proporciona información relevante dentro de Psicología, Derecho o Matemáticas."
+        });
+      }
+    }
+
+    // 🔥 Enviar a Gemini
+    console.log("🚀 Enviando a Gemini:", inputParts);
+
+    const result = await model.generateContent({
+      contents: [{ role: "user", parts: inputParts }]
+    });
+
+    const responseText =
+  result?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join(" ") ||
+  "No pude generar una respuesta.";
+
+    console.log("✅ Respuesta de Gemini:", responseText);
 
     return { response: responseText };
   } catch (error) {
-    console.error("Error en la API de Gemini:", error);
+    console.error("❌ Error en la API de Gemini:", error);
     return { error: "Error al procesar la solicitud a Gemini." };
   }
 });
