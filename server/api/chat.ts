@@ -5,11 +5,12 @@ export default defineEventHandler(async (event) => {
   const apiKey = config.GEMINI_API_KEY;
 
   if (!apiKey) {
-    return { error: "API Key no encontrada. Verifica tu .env y nuxt.config.ts" };
+    console.error("API Key no encontrada. Verifica tu .env y nuxt.config.ts");
+    return { error: "API Key no encontrada." };
   }
 
   const body = await readBody(event);
-  if (!body || !body.message) {
+  if (!body?.message) {
     return { error: "Debes enviar un mensaje en la petición." };
   }
 
@@ -17,13 +18,20 @@ export default defineEventHandler(async (event) => {
     const genAI = new GoogleGenerativeAI(apiKey);
     const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-    // ⚠️ Asegurar que la IA responda en español
-    const prompt = `Por favor, responde en español. ${body.message}`;
+    // 🔹 Instrucción para que solo responda sobre Psicología
+    const prompt = `
+      Eres un experto en Psicología. Solo responde preguntas relacionadas con Psicología. 
+      Si te preguntan algo que no tenga que ver con Psicología, responde: "Lo siento, solo puedo responder preguntas de Psicología."
+      
+      Pregunta del estudiante: ${body.message}
+    `;
 
-    const chat = await model.generateContent(prompt);
-    const response = await chat.response.text(); 
+    const result = await model.generateContent(prompt);
 
-    return { response };
+    // 📌 Accediendo correctamente a la respuesta
+    const responseText = result?.response?.candidates?.[0]?.content?.parts?.map(p => p.text).join(" ") || "No pude generar una respuesta.";
+
+    return { response: responseText };
   } catch (error) {
     console.error("Error en la API de Gemini:", error);
     return { error: "Error al procesar la solicitud a Gemini." };
